@@ -34,6 +34,7 @@ from tqdm import tqdm
 import os
 from transformers import AutoTokenizer, AutoModel, AutoConfig
 from generate import generate, generate_with_prefix_cache, generate_with_dual_cache
+from generate_dynamic_block import generate_with_dynamic_block_length
 from model.modeling_llada import LLaDAModelLM
 import json
 import time
@@ -67,6 +68,7 @@ class LLaDAEvalHarness(LM):
         save_dir=None,
         show_speed=False,
         dual_cache=False,
+        dynamic_block_length=False,
         **kwargs,
     ):
         '''
@@ -132,6 +134,7 @@ class LLaDAEvalHarness(LM):
         self.save_dir = save_dir
         self.show_speed = show_speed
         self.dual_cache = dual_cache
+        self.dynamic_block_length = dynamic_block_length
     @property
     def rank(self):
         return self._rank
@@ -341,7 +344,11 @@ class LLaDAEvalHarness(LM):
                     generated_answer, nfe = generate_with_dual_cache(self.model, input_ids, steps=self.steps, gen_length=self.gen_length, block_length=self.block_length, 
                                         temperature=0, remasking=self.remasking, mask_id=self.mask_id, threshold=self.threshold, factor=self.factor)
                 else:
-                    generated_answer, nfe = generate_with_prefix_cache(self.model, input_ids, steps=self.steps, gen_length=self.gen_length, block_length=self.block_length, 
+                    if self.dynamic_block_length:
+                        generated_answer, nfe = generate_with_dynamic_block_length(self.model, input_ids, steps=self.steps, gen_length=self.gen_length, 
+                                        temperature=0, remasking=self.remasking, mask_id=self.mask_id, threshold=self.threshold, factor=self.factor)
+                    else:
+                        generated_answer, nfe = generate_with_prefix_cache(self.model, input_ids, steps=self.steps, gen_length=self.gen_length, block_length=self.block_length, 
                                         temperature=0, remasking=self.remasking, mask_id=self.mask_id, threshold=self.threshold, factor=self.factor)
             else:
                 generated_answer, nfe = generate(self.model, input_ids, steps=self.steps, gen_length=self.gen_length, block_length=self.block_length, 
