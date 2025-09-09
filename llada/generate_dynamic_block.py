@@ -1,8 +1,8 @@
 import torch
 import torch.nn.functional as F
 import numpy as np
-from typing import Optional  # 类型注解支持
-from .generate import get_num_transfer_tokens, get_transfer_index, get_transfer_index_dynamic
+from typing import Optional
+from .generate import add_gumbel_noise, get_num_transfer_tokens, get_transfer_index, get_transfer_index_dynamic
 
 @torch.no_grad() 
 def generate_with_dynamic_block_length(
@@ -53,7 +53,7 @@ def generate_with_dynamic_block_length(
     # get the first block length
     current_block_start = prompt.shape[1]
     
-    while current_block_start < gen_length:
+    while current_block_start < x.shape[1]:
         # run single model forward with cache, determine the block length
         output = model(x[:, current_block_start:], past_key_values=last_past_key_values, use_cache=True)
         logits = output.logits
@@ -64,20 +64,25 @@ def generate_with_dynamic_block_length(
         x0_p = torch.squeeze(torch.gather(p, dim=-1, index=torch.unsqueeze(x0, -1)), -1) # b, l
         for block_length in range(min_block_length, max_block_length + 1):
             avg_confidence = x0_p[:, :block_length].mean(dim=-1)
-            if avg_confidence.mean() < 0.6:
-                break
             current_block_end = current_block_start + block_length
             if current_block_end >= gen_length:
                 break
-
+            if avg_confidence.mean() < 0.2:
+                break
         nfe += 1
         i = 1
         while True:
             if (x[:, current_block_start:current_block_end] == mask_id).sum() == 0:
+                output = model(x, use_cache=True)
+                # get prefill kv cache for each block
+                past_key_values = output.past_key_values
+                new_past_key_values = []
                 for i in range(len(past_key_values)):
+                    new_past_key_values.append(())
                     for j in range(len(past_key_values[i])):
-                        last_past_key_values[i][j] = mint.cat([last_past_key_values[i][j], past_key_values[i][j][:, :, current_block_start:current_block_end]], dim=-1)
-                current_block_start = current_block_end
+                        new_past_key_values[i] += (past_key_values[i][j][:, :, :prompt.shape[1]],)
+                
+                last_past_key_values = new_past_key_values
                 break
             nfe += 1
             mask_index = (x[:, current_block_start:] == mask_id)
