@@ -67,7 +67,7 @@ def generate_with_dynamic_block_length(
         for block_length in range(min_block_length, max_block_length + 1):
             avg_confidence = x0_p[:, :block_length].mean(dim=-1)
             current_block_end = current_block_start + block_length
-            if current_block_end >= gen_length:
+            if current_block_end >= x.shape[1]:
                 break
             if avg_confidence.mean() < 0.2:
                 break
