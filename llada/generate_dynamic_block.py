@@ -2,7 +2,9 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 from typing import Optional
-from .generate import add_gumbel_noise, get_num_transfer_tokens, get_transfer_index, get_transfer_index_dynamic
+from generate import add_gumbel_noise, get_num_transfer_tokens, get_transfer_index, get_transfer_index_dynamic
+import logging
+logger = logging.getLogger(__name__)
 
 @torch.no_grad() 
 def generate_with_dynamic_block_length(
@@ -69,6 +71,8 @@ def generate_with_dynamic_block_length(
                 break
             if avg_confidence.mean() < 0.2:
                 break
+
+        logger.info(f"Block length: {block_length}, avg confidence: {avg_confidence.mean()}")
         nfe += 1
         i = 1
         while True:
@@ -80,9 +84,10 @@ def generate_with_dynamic_block_length(
                 for i in range(len(past_key_values)):
                     new_past_key_values.append(())
                     for j in range(len(past_key_values[i])):
-                        new_past_key_values[i] += (past_key_values[i][j][:, :, :prompt.shape[1]],)
-                
+                        new_past_key_values[i] += (past_key_values[i][j][:, :, :current_block_end],)
+
                 last_past_key_values = new_past_key_values
+                current_block_start = current_block_end
                 break
             nfe += 1
             mask_index = (x[:, current_block_start:] == mask_id)
