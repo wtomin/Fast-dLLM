@@ -71,7 +71,7 @@ def generate_with_prefix_dynamic_block_length(
     
     while current_block_start < x.shape[1]:
         # run single model forward with prefix cache with the largest block length, to determine the block length
-        output = model(x[:, current_block_start:current_block_start+valid_block_lengths[-1]], past_key_values=last_past_key_values, use_cache=True)
+        output = model(x[:, current_block_start:current_block_start+valid_block_lengths[-1]], past_key_values=past_key_values, use_cache=True)
         logits = output.logits
 
         logits_with_noise = add_gumbel_noise(logits, temperature=temperature)
