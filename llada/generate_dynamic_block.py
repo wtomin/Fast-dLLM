@@ -18,6 +18,7 @@ def powers_of_two_in_range(min_block_length, max_block_length):
     return result
 
 
+
 @torch.no_grad() 
 def generate_with_prefix_dynamic_block_length(
     model,
@@ -49,31 +50,18 @@ def generate_with_prefix_dynamic_block_length(
     x[:, :prompt.shape[1]] = prompt.clone()
 
     assert gen_length % min_block_length == 0 and gen_length % max_block_length == 0, "gen_length must be divisible by min_block_length and max_block_length"
-
-    output = model(x, use_cache=True)
-    # get prefill kv cache for each block
-    past_key_values = output.past_key_values
-    new_past_key_values = []
-    for i in range(len(past_key_values)):
-        new_past_key_values.append(())
-        for j in range(len(past_key_values[i])):
-            new_past_key_values[i] += (past_key_values[i][j][:, :, :prompt.shape[1]],)
-    
-    past_key_values = new_past_key_values
-
     valid_block_lengths = powers_of_two_in_range(min_block_length, max_block_length)
-
     steps = 1
-    nfe = 1
+    nfe = 0
 
-    # get the first block length
     current_block_start = prompt.shape[1]
     
     while current_block_start < x.shape[1]:
-        # run single model forward with prefix cache with the largest block length, to determine the block length
-        output = model(x[:, current_block_start:current_block_start+valid_block_lengths[-1]], past_key_values=past_key_values, use_cache=True)
-        logits = output.logits
+        output = model(x, use_cache=True)
+        past_key_values = output.past_key_values
 
+        # run single model forward to determine the block length
+        logits = output.logits
         logits_with_noise = add_gumbel_noise(logits, temperature=temperature)
         x0 = torch.argmax(logits_with_noise, dim=-1) # b, l     
         p = F.softmax(logits, dim=-1)
@@ -87,29 +75,39 @@ def generate_with_prefix_dynamic_block_length(
                 break
 
         logger.info(f"Block length: {block_length}, avg confidence: {avg_confidence.mean()}")
+
+        block_mask_index = (x[:, current_block_start:current_block_end] == mask_id)
+        num_transfer_tokens = get_num_transfer_tokens(block_mask_index, steps)
+        mask_index = (x == mask_id)
+        mask_index[:, current_block_end:] = 0
+        if factor is None:
+            x0, transfer_index = get_transfer_index(output.logits, temperature, remasking, mask_index, x, num_transfer_tokens[:, 0] if threshold is None else None, threshold)
+        else:
+            x0, transfer_index = get_transfer_index_dynamic(output.logits, temperature, remasking, mask_index, x, None, factor)
+        x[transfer_index] = x0[transfer_index]
+
+
+        new_past_key_values = []
+        for i in range(len(past_key_values)):
+            new_past_key_values.append(())
+            for j in range(len(past_key_values[i])):
+                new_past_key_values[i] += (past_key_values[i][j][:, :, :current_block_start],)
+        
+        past_key_values = new_past_key_values
+
+
         nfe += 1
         i = 1
         while True:
             if (x[:, current_block_start:current_block_end] == mask_id).sum() == 0:
-                output = model(x, use_cache=True)
-                nfe += 1
-                # get prefill kv cache for each block
-                past_key_values = output.past_key_values
-                new_past_key_values = []
-                for i in range(len(past_key_values)):
-                    new_past_key_values.append(())
-                    for j in range(len(past_key_values[i])):
-                        new_past_key_values[i] += (past_key_values[i][j][:, :, :current_block_end],)
-
-                past_key_values = new_past_key_values
                 current_block_start = current_block_end
                 break
-
+            nfe += 1
             mask_index = (x[:, current_block_start:] == mask_id)
             mask_index[:, block_length:] = 0
 
             logits = model(x[:, current_block_start:], past_key_values=past_key_values, use_cache=True).logits
-            nfe += 1
+
             logits_with_noise = add_gumbel_noise(logits, temperature=temperature)
             x0 = torch.argmax(logits_with_noise, dim=-1) # b, l
 
