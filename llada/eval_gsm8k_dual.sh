@@ -1,7 +1,7 @@
 # Set the environment variables first before running the command.
 export HF_ALLOW_CODE_EVAL=1
 export HF_DATASETS_TRUST_REMOTE_CODE=true
-
+export CUDA_VISIBLE_DEVICES=1
 task=gsm8k
 length=256
 block_length=32
@@ -13,21 +13,21 @@ model_path='GSAI-ML/LLaDA-8B-Instruct'
 
 
 # baseline
-accelerate launch eval_llada.py --tasks ${task} --num_fewshot ${num_fewshot} \
+python eval_llada.py --tasks ${task} --num_fewshot ${num_fewshot} \
 --confirm_run_unsafe_code --model llada_dist \
 --model_args model_path=${model_path},gen_length=${length},steps=${length},block_length=${block_length},show_speed=True \
 --limit 50 
 
 
-# prefix cache+parallel factor
-accelerate launch eval_llada.py --tasks ${task} --num_fewshot ${num_fewshot} \
+# dual cache+parallel factor
+python eval_llada.py --tasks ${task} --num_fewshot ${num_fewshot} \
 --confirm_run_unsafe_code --model llada_dist \
---model_args model_path=${model_path},gen_length=${length},steps=${steps},block_length=${block_length},use_cache=True,factor=${factor},show_speed=True \
+--model_args model_path=${model_path},gen_length=${length},steps=${steps},block_length=${block_length},use_cache=True,dual_cache=True,factor=${factor},show_speed=True \
 --limit 50 
 
 
 # dynamic block length+parallel
-accelerate launch eval_llada.py --tasks ${task} --num_fewshot ${num_fewshot} \
+python eval_llada.py --tasks ${task} --num_fewshot ${num_fewshot} \
 --confirm_run_unsafe_code --model llada_dist \
---model_args model_path=${model_path},gen_length=${length},steps=${steps},use_cache=True,dynamic_block_length=True,factor=${factor},show_speed=True \
+--model_args model_path=${model_path},gen_length=${length},steps=${steps},use_cache=True,dual_cache=True,dynamic_block_length=True,factor=${factor},show_speed=True \
 --limit 50 
