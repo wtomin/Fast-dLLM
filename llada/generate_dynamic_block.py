@@ -54,7 +54,7 @@ def generate_with_dual_dynamic_block_length(model, prompt, steps=128, gen_length
         p = F.softmax(logits, dim=-1)
         x0_p = torch.squeeze(torch.gather(p, dim=-1, index=torch.unsqueeze(x0, -1)), -1) # b, l
         for block_length in valid_block_lengths:
-            avg_confidence = x0_p[:, :block_length].mean(dim=-1)
+            avg_confidence = x0_p[:, current_block_start:current_block_start+block_length].mean(dim=-1)
             current_block_end = current_block_start + block_length
             if current_block_end >= x.shape[1]:
                 break
@@ -147,7 +147,7 @@ def generate_with_prefix_dynamic_block_length(
         p = F.softmax(logits, dim=-1)
         x0_p = torch.squeeze(torch.gather(p, dim=-1, index=torch.unsqueeze(x0, -1)), -1) # b, l
         for block_length in valid_block_lengths:
-            avg_confidence = x0_p[:, :block_length].mean(dim=-1)
+            avg_confidence = x0_p[:, current_block_start:current_block_start+block_length].mean(dim=-1)
             current_block_end = current_block_start + block_length
             if current_block_end >= x.shape[1]:
                 break
