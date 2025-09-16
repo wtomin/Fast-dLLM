@@ -18,7 +18,7 @@ def powers_of_two_in_range(min_block_length, max_block_length):
     return result
 
 @ torch.no_grad()
-def generate_with_dual_dynamic_block_length(model, prompt, steps=128, gen_length=128, block_length=128, temperature=0.,
+def generate_with_dual_dynamic_block_length(model, prompt, steps=128, gen_length=128,  temperature=0.,
             min_block_length=4, max_block_length=64,
             remasking='low_confidence', mask_id=126336, threshold=None, factor=None):
     '''

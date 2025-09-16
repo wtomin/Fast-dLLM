@@ -18,7 +18,7 @@ def powers_of_two_in_range(min_block_length, max_block_length):
     return result
 
 @ torch.no_grad()
-def generate_with_dual_dynamic_block_length(model, prompt, steps=128, gen_length=128, block_length=128, temperature=0.,
+def generate_with_dual_dynamic_block_length(model, prompt, steps=128, gen_length=128, temperature=0.,
             min_block_length=4, max_block_length=64,
             remasking='low_confidence', mask_id=126336, threshold=None, factor=None,
             sub_block_ratio=0.5):
@@ -42,7 +42,6 @@ def generate_with_dual_dynamic_block_length(model, prompt, steps=128, gen_length
     valid_block_lengths = powers_of_two_in_range(min_block_length, max_block_length)
     steps = 1
     assert sub_block_ratio > 0 and sub_block_ratio <= 0.5, "sub_block_ratio must be between 0 and 0.5"
-    assert int(block_length * sub_block_ratio)> 0 and int(block_length * sub_block_ratio) % 2 == 0, "block_length * sub_block_ratio must be even and positive"
 
     nfe = 0  
     current_block_start = prompt.shape[1]
@@ -156,7 +155,6 @@ def generate_with_prefix_dynamic_block_length(
     steps = 1
     nfe = 0
     assert sub_block_ratio > 0 and sub_block_ratio <= 0.5, "sub_block_ratio must be between 0 and 0.5"
-    assert int(block_length * sub_block_ratio)> 0 and int(block_length * sub_block_ratio) % 2 == 0, "block_length * sub_block_ratio must be even and positive"
 
     current_block_start = prompt.shape[1]
     
