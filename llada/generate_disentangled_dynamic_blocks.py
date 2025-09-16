@@ -100,6 +100,8 @@ def generate_with_dual_dynamic_block_length(model, prompt, steps=128, gen_length
                 sub_block_end = min(current_block_start + (k + 1) * int(block_length * sub_block_ratio), current_block_end)
 
                 mask_index = (x[:, sub_block_start:sub_block_end] == mask_id)
+                if mask_index.sum() == 0:
+                    continue
                 slice_start = sub_block_start - current_block_start
                 slice_end = sub_block_end - current_block_start
                 sub_block_logits = logits[:, slice_start:slice_end]
@@ -219,6 +221,8 @@ def generate_with_prefix_dynamic_block_length(
                 sub_block_end = min(current_block_start + (k + 1) * int(block_length * sub_block_ratio), current_block_end)
 
                 mask_index = (x[:, sub_block_start:sub_block_end] == mask_id)
+                if mask_index.sum() == 0:
+                    continue
                 slice_start = sub_block_start - current_block_start
                 slice_end = sub_block_end - current_block_start
                 sub_block_logits = logits[:, slice_start:slice_end]
