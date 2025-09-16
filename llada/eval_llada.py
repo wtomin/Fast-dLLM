@@ -34,7 +34,6 @@ from tqdm import tqdm
 import os
 from transformers import AutoTokenizer, AutoModel, AutoConfig
 from generate import generate, generate_with_prefix_cache, generate_with_dual_cache
-from generate_dynamic_block import generate_with_prefix_dynamic_block_length, generate_with_dual_dynamic_block_length
 from model.modeling_llada import LLaDAModelLM
 import json
 import time
@@ -69,6 +68,7 @@ class LLaDAEvalHarness(LM):
         show_speed=False,
         dual_cache=False,
         dynamic_block_length=False,
+        sub_block_ratio=None,
         **kwargs,
     ):
         '''
@@ -87,6 +87,8 @@ class LLaDAEvalHarness(LM):
                              we recommend setting is_check_greedy to False. This configuration causes suffix_greedy_prediction() to return False 
                              by default, significantly accelerating the evaluation process.
             cfg_scale: Unsupervised classifier-free guidance scale.
+            dynamic_block_length: Whether to use dynamic block length.
+            sub_block_ratio: The ratio of sub-block to the block. The actual decoding length is block_length * sub_block_ratio. None means not using disentangled dynamic blocks.
         '''
         super().__init__()
 
@@ -135,6 +137,7 @@ class LLaDAEvalHarness(LM):
         self.show_speed = show_speed
         self.dual_cache = dual_cache
         self.dynamic_block_length = dynamic_block_length
+        self.sub_block_ratio = sub_block_ratio
     @property
     def rank(self):
         return self._rank
@@ -342,15 +345,31 @@ class LLaDAEvalHarness(LM):
             if self.use_cache:
                 if self.dual_cache:
                     if self.dynamic_block_length:
-                        generated_answer, nfe = generate_with_dual_dynamic_block_length(self.model, input_ids, steps=self.steps, gen_length=self.gen_length,
-                                        temperature=0, remasking=self.remasking, mask_id=self.mask_id, threshold=self.threshold, factor=self.factor)
+                        if self.sub_block_ratio is None:
+                            from generate_dynamic_block import generate_with_dual_dynamic_block_length
+                            generated_answer, nfe = generate_with_dual_dynamic_block_length(self.model, input_ids, steps=self.steps, gen_length=self.gen_length,
+                                            temperature=0, remasking=self.remasking, mask_id=self.mask_id, threshold=self.threshold, factor=self.factor)
+                        elif isinstance(self.sub_block_ratio, float):
+                            from generate_disentangled_dynamic_blocks import generate_with_dual_dynamic_block_length
+                            generated_answer, nfe = generate_with_dual_dynamic_block_length(self.model, input_ids, steps=self.steps, gen_length=self.gen_length,
+                                            temperature=0, remasking=self.remasking, mask_id=self.mask_id, threshold=self.threshold, factor=self.factor, sub_block_ratio=self.sub_block_ratio)
+                        else:
+                            raise ValueError(f"sub_block_ratio must be a float or None, but got {self.sub_block_ratio}")
                     else:
                         generated_answer, nfe = generate_with_dual_cache(self.model, input_ids, steps=self.steps, gen_length=self.gen_length, block_length=self.block_length, 
                                         temperature=0, remasking=self.remasking, mask_id=self.mask_id, threshold=self.threshold, factor=self.factor)
                 else:
                     if self.dynamic_block_length:
-                        generated_answer, nfe = generate_with_prefix_dynamic_block_length(self.model, input_ids, steps=self.steps, gen_length=self.gen_length, 
-                                        temperature=0, remasking=self.remasking, mask_id=self.mask_id, threshold=self.threshold, factor=self.factor)
+                        if self.sub_block_ratio is None:
+                            from generate_dynamic_block import generate_with_prefix_dynamic_block_length
+                            generated_answer, nfe = generate_with_prefix_dynamic_block_length(self.model, input_ids, steps=self.steps, gen_length=self.gen_length, 
+                                            temperature=0, remasking=self.remasking, mask_id=self.mask_id, threshold=self.threshold, factor=self.factor)
+                        elif isinstance(self.sub_block_ratio, float):
+                            from generate_disentangled_dynamic_blocks import generate_with_prefix_dynamic_block_length
+                            generated_answer, nfe = generate_with_prefix_dynamic_block_length(self.model, input_ids, steps=self.steps, gen_length=self.gen_length, 
+                                            temperature=0, remasking=self.remasking, mask_id=self.mask_id, threshold=self.threshold, factor=self.factor, sub_block_ratio=self.sub_block_ratio)
+                        else:
+                            raise ValueError(f"sub_block_ratio must be a float or None, but got {self.sub_block_ratio}")
                     else:
                         generated_answer, nfe = generate_with_prefix_cache(self.model, input_ids, steps=self.steps, gen_length=self.gen_length, block_length=self.block_length, 
                                         temperature=0, remasking=self.remasking, mask_id=self.mask_id, threshold=self.threshold, factor=self.factor)
