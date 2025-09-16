@@ -14,10 +14,10 @@ sub_block_ratio=0.5
 
 
 # baseline
-python eval_llada.py --tasks ${task} --num_fewshot ${num_fewshot} \
---confirm_run_unsafe_code --model llada_dist \
---model_args model_path=${model_path},gen_length=${length},steps=${length},block_length=${block_length},show_speed=True \
---limit 50 
+# python eval_llada.py --tasks ${task} --num_fewshot ${num_fewshot} \
+# --confirm_run_unsafe_code --model llada_dist \
+# --model_args model_path=${model_path},gen_length=${length},steps=${length},block_length=${block_length},show_speed=True \
+# --limit 50 
 
 
 # prefix cache+parallel factor
